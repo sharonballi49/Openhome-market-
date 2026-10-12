@@ -26,3 +26,23 @@ $('filters').addEventListener('submit',e=>{e.preventDefault();render();});['quer
 $('saved-toggle').addEventListener('click',()=>{savedOnly=!savedOnly;render();});$('saved-nav').addEventListener('click',()=>{savedOnly=true;$('filters').reset();render();$('homes').scrollIntoView();$('saved-toggle').focus({preventScroll:true});});$('clear').addEventListener('click',()=>{$('filters').reset();$('sort').value='featured';savedOnly=false;render();});
 $('seller-form').addEventListener('submit',e=>{e.preventDefault();const f=new FormData(e.target);const p={id:'d-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),title:String(f.get('title')).trim(),area:String(f.get('area')).trim(),zip:String(f.get('zip')).trim(),price:Number(f.get('price')),beds:Number(f.get('beds')),baths:Number(f.get('baths')),sqft:Number(f.get('sqft')),type:String(f.get('type')),description:String(f.get('description')).trim(),draft:true,color:drafts.length%6};if(!p.title||!p.area||!p.description){toast('Please fill in the title, neighborhood, and description.');return;}drafts.unshift(p);const persisted=write('ohm-drafts-v1',drafts);e.target.reset();$('seller').close();$('filters').reset();$('sort').value='featured';savedOnly=false;render();$('homes').scrollIntoView();toast(persisted?'Demo listing saved in this browser. It is not public.':'Draft created for this session only. Browser storage is unavailable.');});
 $('hero-art').insertAdjacentHTML('afterbegin',art(0,true));render();
+
+const pricingPackages = {
+ featured: {name:'Featured home',price:'$49 / 30 days',summary:'A planned 30-day sponsored placement for your home. Your basic listing stays free. No automatic renewal is planned, and visibility does not guarantee a sale.'},
+ marketing: {name:'Seller marketing kit',price:'$99 / one time',summary:'Planned deliverables: polished listing copy, a downloadable property flyer, and social media graphics. Photography, printing, and paid advertising budgets are not included. Delivery timing will be confirmed before launch.'},
+ trial: {name:'Founding business trial',price:'Free / 30 days',summary:'A proposed introductory directory profile for contractors, painters, cleaners, landscapers, and movers. A trial would not automatically convert to a paid membership. Applications are not open yet.'},
+ directory: {name:'Business directory',price:'$49 / month',summary:'A proposed paid advertising profile with business details, photos, service area, and a website link. Final rates and subscription terms will be confirmed before launch. No leads or jobs are guaranteed. Settlement-service providers require a separately reviewed arrangement.'}
+};
+['seller','business'].forEach(audience => $(audience+'-pricing-button').addEventListener('click', () => {
+ ['seller','business'].forEach(name => { $(name+'-pricing').hidden = name !== audience; $(name+'-pricing-button').setAttribute('aria-pressed',String(name === audience)); });
+}));
+document.addEventListener('click', event => {
+ const button=event.target.closest('[data-plan]');
+ if(!button)return;
+ const plan=pricingPackages[button.dataset.plan];
+ if(!plan)return;
+ $('plan-title').textContent=plan.name;
+ $('plan-price').textContent=plan.price;
+ $('plan-summary').textContent=plan.summary;
+ $('plan-detail').showModal();
+});

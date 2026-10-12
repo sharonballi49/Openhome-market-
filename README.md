@@ -27,3 +27,7 @@ The name, domain, and trademark availability have not been checked. This reposit
 ## Validation
 
 JavaScript syntax and static asset references checked locally. Browser visual and interaction testing remains to be done. This is a prototype, not a production-ready transaction platform.
+
+## Proposed launch pricing
+
+The pricing section switches between home-seller and local-business plans. It shows free basic listings, a $49/30-day featured listing, a $99 one-time marketing kit, a proposed 30-day founding business trial, and a $49/month business directory. These are proposed rates only. Package buttons show details; there is no checkout, subscription, application submission, or payment processing. Settlement-service advertising requires separate review before paid participation.

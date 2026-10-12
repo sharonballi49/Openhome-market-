@@ -31,3 +31,7 @@ JavaScript syntax and static asset references checked locally. Browser visual an
 ## Proposed launch pricing
 
 The pricing section switches between home-seller and local-business plans. It shows free basic listings, a $49/30-day featured listing, a $99 one-time marketing kit, a proposed 30-day founding business trial, and a $49/month business directory. These are proposed rates only. Package buttons show details; there is no checkout, subscription, application submission, or payment processing. Settlement-service advertising requires separate review before paid participation.
+
+## Lender connections
+
+The Home financing section is ready for approved external lender links. No lender is currently configured. Add profiles to `partners.js` using the documented fields only after the business approves the name, service area, and HTTPS destination. Links open on the lender's own site, without collecting or transmitting borrower data through OpenHome Market. Paid profiles must be explicitly marked as sponsored. This is not a loan-origination system or an affiliate arrangement; any paid arrangement needs appropriate review. Never publish invented partner names, lending terms, or application links.

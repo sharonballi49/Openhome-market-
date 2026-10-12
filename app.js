@@ -46,3 +46,20 @@ document.addEventListener('click', event => {
  $('plan-summary').textContent=plan.summary;
  $('plan-detail').showModal();
 });
+
+// Lender links stay unavailable until real partner details are configured.
+function partnerHttpsUrl(value) {
+ try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password ? url.href : null; }
+ catch { return null; }
+}
+function renderLenders() {
+ const configured = Array.isArray(window.OPENHOME_LENDERS) ? window.OPENHOME_LENDERS : [];
+ const lenders = configured.filter(partner => partner && typeof partner.name === 'string' && partner.name.trim() && typeof partner.serviceArea === 'string' && partnerHttpsUrl(partner.applicationUrl));
+ $('lender-empty').hidden = lenders.length > 0;
+ $('lender-list').innerHTML = lenders.map(partner => {
+   const url = partnerHttpsUrl(partner.applicationUrl);
+   const website = partnerHttpsUrl(partner.website);
+   return `<article class="lender-card"><p class="eyebrow">${partner.sponsored === true ? 'SPONSORED LENDER PROFILE' : 'INDEPENDENT LENDER'}</p><h3>${safe(partner.name)}</h3><p>${safe(partner.serviceArea)}</p>${website ? `<a class="lender-website" href="${safe(website)}" target="_blank" rel="noopener noreferrer${partner.sponsored === true ? ' sponsored' : ''}">Visit lender website ↗ <span class="sr-only">(opens a new tab)</span></a>` : ''}<a class="primary lender-apply" href="${safe(url)}" target="_blank" rel="noopener noreferrer${partner.sponsored === true ? ' sponsored' : ''}">View loan options ↗ <span class="sr-only">(opens a new tab on the lender's website)</span></a><p class="small">Opens the lender's website. Eligibility, rates, and approval are determined by the lender.</p></article>`;
+ }).join('');
+}
+renderLenders();

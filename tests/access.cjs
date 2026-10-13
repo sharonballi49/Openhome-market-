@@ -1,0 +1,43 @@
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const {PGlite}=require('@electric-sql/pglite');
+(async()=>{
+ const db=new PGlite();
+ await db.exec(`create role anon;create role authenticated;create schema auth;create schema storage;
+ create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);
+ create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+ grant usage on schema auth,storage to anon,authenticated;grant execute on function auth.uid() to anon,authenticated;
+ create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
+ create table storage.objects(id uuid default gen_random_uuid(),bucket_id text,name text);
+ alter table storage.objects enable row level security;
+ grant select,insert,delete on storage.objects to anon,authenticated;
+ create function storage.foldername(text) returns text[] language sql immutable as $$select (string_to_array($1,'/'))[1:array_length(string_to_array($1,'/'),1)-1]$$;`);
+ await db.exec(fs.readFileSync(path.join(__dirname,'../backend/schema.sql'),'utf8'));
+ const seller='11111111-1111-4111-8111-111111111111',buyer='22222222-2222-4222-8222-222222222222',stranger='33333333-3333-4333-8333-333333333333',home='44444444-4444-4444-8444-444444444444';
+ await db.query(`insert into auth.users values($1,'seller@example.test',now()),($2,'buyer@example.test',now()),($3,'other@example.test',now())`,[seller,buyer,stranger]);
+ async function role(id){await db.exec('reset role');await db.query("select set_config('request.jwt.claim.sub',$1,false)",[id||'']);await db.exec(id?'set role authenticated':'set role anon');}
+ async function rejected(sql,args){await assert.rejects(()=>db.query(sql,args));}
+ await role(seller);
+ const photo=`${seller}/${home}/test.jpg`;
+ await db.query('insert into storage.objects(bucket_id,name) values($1,$2)',['home-photos',photo]);
+ await db.query(`insert into public.listings(id,owner_id,title,area,zip,price,beds,baths,sqft,type,description,photos) values($1,$2,'Test','Stone Oak','78258',450000,3,2,2000,'House','A test home',$3)`,[home,seller,[photo]]);
+ assert.equal((await db.query('select * from public.listings')).rows.length,1);
+ await rejected("update public.listings set status='published' where id=$1",[home]);
+ await role(buyer);assert.equal((await db.query('select * from public.listings')).rows.length,0);assert.equal((await db.query('select * from storage.objects')).rows.length,0);
+ assert.equal((await db.query("update public.listings set title='Hacked' where id=$1 returning id",[home])).rows.length,0);
+ await rejected("select public.send_inquiry($1,'Buyer','Interested in this home')",[home]);
+ await db.exec("reset role;update public.listings set status='published'");
+ await role(null);assert.equal((await db.query('select * from public.listings')).rows.length,1);assert.equal((await db.query('select * from storage.objects')).rows.length,1);await rejected('select * from public.inquiries');
+ await role(buyer);await db.query("select public.send_inquiry($1,'Buyer','Interested in seeing the property')",[home]);
+ await rejected("select public.send_inquiry($1,'Buyer','Repeated inquiry too soon')",[home]);
+ await rejected("insert into public.inquiries(listing_id,seller_id,buyer_id,buyer_name,buyer_email,message) values($1,$2,$3,'Spoof','spoof@example.test','A spoofed inquiry')",[home,seller,buyer]);
+ await role(stranger);assert.equal((await db.query('select * from public.inquiries')).rows.length,0);
+ await role(seller);const inbox=(await db.query('select * from public.inquiries')).rows;assert.equal(inbox.length,1);assert.equal(inbox[0].buyer_email,'buyer@example.test');
+ await db.query("update public.listings set title='Updated',status='pending' where id=$1",[home]);
+ await role(null);assert.equal((await db.query('select * from public.listings')).rows.length,0);assert.equal((await db.query('select * from storage.objects')).rows.length,0);
+ await role(seller);await db.query("update public.listings set status='archived' where id=$1",[home]);
+ await rejected('update public.listings set photos=$1 where id=$2',[[`${buyer}/${home}/stolen.jpg`],home]);
+ console.log('PASS: pending/photo privacy, owner-only writes, admin-only approval, public visibility, verified inquiry identities, inquiry privacy/rate limit, withdrawal.');
+ await db.close();
+})().catch(e=>{console.error(e);process.exitCode=1});

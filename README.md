@@ -2,36 +2,39 @@
 
 **Your home. Your buyer. Your move.**
 
-A responsive first-stage prototype for an owner-to-owner real estate marketplace in San Antonio, Texas. Clean rebuild for the existing repository `sharonballi49/Openhome-market-`.
+San Antonio owner-to-owner marketplace, hosted on GitHub Pages. The public site currently runs in **demo/private-draft mode**. No real listings, buyer messages, accounts, or payments are live yet.
 
-## Run
+## Working now
 
-Open `index.html` in a modern browser, or serve the folder with `python3 -m http.server 8000` and open `http://localhost:8000`. No packages, build step, or external assets are required.
+- Home search, price sorting, saved homes, and fictional sample listings.
+- My listings dashboard: create, edit, delete, and download backups of private local drafts.
+- Up to six home photos per draft, resized to JPEG with metadata removed; cover selection and property gallery.
+- Storage failures keep the form open instead of falsely claiming the draft was saved.
+- Proposed seller/business pricing, lender placeholders, and an independent contract-help section explaining attorneys, brokers, and title companies.
 
-## Included
+Local drafts and favorites are stored in this browser. They are not uploaded or published. Clearing browser data removes them. JSON backups are available; automatic import/restore is not implemented.
 
-- Responsive home search by neighborhood, ZIP, maximum price, bedrooms, and property type.
-- Price sorting, property details, saved homes, and empty states.
-- Demo seller form with input validation, local draft persistence, and deletion.
-- Original SVG home illustrations, explicitly labeled as illustrations.
-- Native accessible dialogs, labeled inputs, keyboard focus indicators, reduced-motion support.
+## Prepared, not activated
 
-All six sample homes, prices, and descriptions are fictional. Local drafts and saved homes use browser localStorage. There is no backend and no data is submitted anywhere. Private browsing or blocked browser storage can prevent persistence.
+Email-code sign-in, shared listing submissions, private photo storage, manual listing approval, owner editing/withdrawal, and authenticated buyer inquiries are implemented behind `config.js` (disabled by default). See [backend/SETUP.md](backend/SETUP.md) for the Supabase setup and required staging checks. No backend account was created and no live service integration has been verified.
 
-## Before public launch
+Database policies restrict pending listings and photos to their owners. Only an administrator can publish a listing. Inquiries use the buyer's verified account email, with per-account rate limits and access restricted to the buyer and seller. Sellers see received messages in My listings; reply opens their email app. Email notifications, a custom moderation interface, and in-app reply threads are not included.
 
-Implement authentication, a shared database, photo storage, owner verification, listing moderation, buyer inquiries, showing requests, reporting, and spam controls. Add privacy terms and marketplace terms after review of the operating model. Decide on the hosting provider and backend before collecting personal information. No payment, messaging, professional-service integration, verification claim, or actual seller account is implemented.
+## Run and validate
 
-The name, domain, and trademark availability have not been checked. This repository contains the clean prototype source. Hosting is separate from source storage. GitHub Pages can serve the root directory as a static site.
+Serve this folder with a static web server. No production build step is required. `vendor/supabase.js` is the pinned 2.57.4 UMD distribution of `@supabase/supabase-js`; its MIT license is included. It only connects to a service when configuration is enabled.
 
-## Validation
+Development checks:
 
-JavaScript syntax and static asset references checked locally. Browser visual and interaction testing remains to be done. This is a prototype, not a production-ready transaction platform.
+```sh
+npm install
+npm test
+```
 
-## Proposed launch pricing
+DOM interaction checks cover drafts, editing, deletion, escaped content, search, pricing, and quota failures. PGlite tests exercise the SQL with simulated Supabase auth/storage tables and two account roles plus an unrelated user. They verify private/published visibility, owner-only writes, approval restrictions, storage policies, inquiry identity/access, and throttling. These checks do not replace end-to-end tests against a configured Supabase service. Browser visual QA was unavailable in this session.
 
-The pricing section switches between home-seller and local-business plans. It shows free basic listings, a $49/30-day featured listing, a $99 one-time marketing kit, a proposed 30-day founding business trial, and a $49/month business directory. These are proposed rates only. Package buttons show details; there is no checkout, subscription, application submission, or payment processing. Settlement-service advertising requires separate review before paid participation.
+## Business configuration
 
-## Lender connections
+Proposed launch plans: free basic listings; $49/30-day featured homes; $99 marketing kits; $49/month ads for local home-service businesses. Checkout is not connected. Professional fees are independently agreed and paid directly. Contract-help profiles remain empty until real providers are selected. Founding contract/closing professionals are intended to begin with free profiles; any later paid settlement-service arrangement requires separate review.
 
-The Home financing section is ready for approved external lender links. No lender is currently configured. Add profiles to `partners.js` using the documented fields only after the business approves the name, service area, and HTTPS destination. Links open on the lender's own site, without collecting or transmitting borrower data through OpenHome Market. Paid profiles must be explicitly marked as sponsored. This is not a loan-origination system or an affiliate arrangement; any paid arrangement needs appropriate review. Never publish invented partner names, lending terms, or application links.
+Approved external lender links belong in `partners.js`. Do not add invented companies, prices, credentials, or partnerships. Sponsored profiles must be identified. The marketplace does not prepare contracts, provide legal advice, approve loans, or hold earnest money.

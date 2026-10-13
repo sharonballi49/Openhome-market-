@@ -11,14 +11,15 @@ San Antonio owner-to-owner marketplace, hosted on GitHub Pages. The public site 
 - Up to six home photos per draft, resized to JPEG with metadata removed; cover selection and property gallery.
 - Storage failures keep the form open instead of falsely claiming the draft was saved.
 - Proposed seller/business pricing, lender placeholders, and an independent contract-help section explaining attorneys, brokers, and title companies.
+- Safety resources with official Bexar appraisal/deed links, plus clearly labeled interactive demos of approval, private messages, blocking, and reports.
 
 Local drafts and favorites are stored in this browser. They are not uploaded or published. Clearing browser data removes them. JSON backups are available; automatic import/restore is not implemented.
 
 ## Prepared, not activated
 
-Email-code sign-in, shared listing submissions, private photo storage, manual listing approval, owner editing/withdrawal, and authenticated buyer inquiries are implemented behind `config.js` (disabled by default). See [backend/SETUP.md](backend/SETUP.md) for the Supabase setup and required staging checks. No backend account was created and no live service integration has been verified.
+Email-code sign-in, invitation-only seller submissions, private ownership details/photo storage, moderator approval, owner editing/withdrawal, private conversations, blocking, and safety reports are implemented behind `config.js` (disabled by default). See [backend/SETUP.md](backend/SETUP.md) for the Supabase setup and required staging checks. No backend account was created and no live service integration has been verified.
 
-Database policies restrict pending listings and photos to their owners. Only an administrator can publish a listing. Inquiries use the buyer's verified account email, with per-account rate limits and access restricted to the buyer and seller. Sellers see received messages in My listings; reply opens their email app. Email notifications, a custom moderation interface, and in-app reply threads are not included.
+Database policies restrict pending listings and photos to their owners and authorized moderators. Only an administrator can publish a listing. Account emails are not selectable by conversation partners. Messages and replies are restricted to the buyer and seller, with per-account rate limits and blocking enforced by the server. Moderators see reported content snapshots, with no access to unrelated chats. Moderator decisions are logged and reject stale listing revisions. Public records links assist manual review; automated identity/ownership verification is not implemented. Email notifications and browser-based membership administration are not included.
 
 ## Run and validate
 
@@ -31,7 +32,7 @@ npm install
 npm test
 ```
 
-DOM interaction checks cover drafts, editing, deletion, escaped content, search, pricing, and quota failures. PGlite tests exercise the SQL with simulated Supabase auth/storage tables and two account roles plus an unrelated user. They verify private/published visibility, owner-only writes, approval restrictions, storage policies, inquiry identity/access, and throttling. These checks do not replace end-to-end tests against a configured Supabase service. Browser visual QA was unavailable in this session.
+DOM interaction checks cover drafts, editing, deletion, escaped content, search, pricing, and quota failures. PGlite tests exercise the SQL with simulated Supabase auth/storage tables and two account roles plus an unrelated user. They verify private/published visibility, owner-only writes, pilot invitations, private property information, reviewer checks and stale revisions, storage policies, private messages, bidirectional blocks, report evidence, restricted moderator access, takedown, and throttling. DOM tests also cover the safety demos and private-state clearing. These checks do not replace end-to-end tests against a configured Supabase service. Browser visual QA was unavailable in this session.
 
 ## Business configuration
 

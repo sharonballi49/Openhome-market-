@@ -2,7 +2,7 @@
 (() => {
  const config = window.OPENHOME_CONFIG || {};
  const enabled = config.enabled === true;
- let client, user = null, homes = [], editing = null, photos = [], photoBusy = false, saving = false, inquiryId = null, signInEmail = '', loadVersion = 0;
+ let client, user = null, homes = [], editing = null, photos = [], photoBusy = false, saving = false, inquiryId = null, signInEmail = '', loadVersion = 0, sellerVersion = 0;
  const bucket = 'home-photos';
  const fields = ['title','area','zip','price','beds','baths','sqft','type','description'];
  const photoUrl = p => typeof p === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(p) ? p : typeof p?.url === 'string' && p.url.startsWith(config.supabaseUrl + '/storage/v1/') ? p.url : null;
@@ -10,11 +10,13 @@
  const errorText = error => error?.message || 'Something went wrong. Please try again.';
  const findHome = id => [...drafts,...homes,...samples].find(p => p.id === id);
  function modal(id) { if (!$(id).open) $(id).showModal(); }
- function statusLabel(p) { return p.draft ? 'Private draft · this device' : ({pending:'Awaiting review',published:'Published',archived:'Withdrawn'})[p.status] || 'Draft'; }
+ function statusLabel(p) { return p.draft ? 'Private draft · this device' : ({pending:'Awaiting review',published:'Published',archived:'Withdrawn',rejected:'Changes requested'})[p.status] || 'Draft'; }
  function drawPhotos() {
   $('photo-preview').innerHTML = photos.map((p,i) => `<div class="photo-tile"><img src="${safe(photoUrl(p)||'')}" alt="Photo ${i+1}"><span>${i===0?'Cover photo':`Photo ${i+1}`}</span>${i?`<button type="button" data-cover="${i}">Make cover</button>`:''}<button type="button" data-remove-photo="${i}">Remove</button></div>`).join('');
  }
- function openSeller(id) {
+ async function openSeller(id) {
+  const version=++sellerVersion, openingUser=user?.id;
+  if (enabled && user && !await window.OpenHomeSafety?.canSell()) { toast("Seller submissions are invitation-only during the pilot."); return; }
   if (enabled && !user) { $('dashboard').close(); modal('auth-dialog'); return; }
   const home = id ? findHome(id) : null;
   if (id && (!home || (enabled && home.owner_id !== user?.id))) return;
@@ -24,13 +26,17 @@
   $('seller-intro').textContent = enabled ? 'Submit your home for review. Approved listings can be seen by buyers. Changes to a published listing need a new review.' : 'Your private draft and photos stay on this device. Nothing is published or sent.';
   $('publish-consent').hidden = !enabled; $('seller-form').elements.consent.required = enabled;
   $('save-listing').textContent = enabled ? 'Submit for review' : 'Save private draft';
+  $('private-verification').hidden=!enabled;
+  for(const k of ['claimant_name','property_address','county']) $('seller-form').elements[k].required=enabled;
+  if(enabled&&home){const result=await client.from('listing_verification').select('claimant_name,property_address,county,relationship,record_reference').eq('listing_id',home.id).maybeSingle();if(version!==sellerVersion||openingUser!==user?.id)return;if(result.error){toast('Could not load private details. Please try again.');return;}if(result.data)for(const [k,v] of Object.entries(result.data))$('seller-form').elements[k].value=v;}
   $('seller-error').textContent = ''; $('photo-status').textContent = ''; drawPhotos();
   $('dashboard').close(); $('detail').close(); modal('seller');
  }
  function showDetail(id) {
   const p = findHome(id); if (!p) return;
   const own = p.draft || (user && p.owner_id === user.id);
-  $('detail-content').innerHTML = `<div class="detail-art" id="detail-photo">${image(p)||art(p.color||0)}</div>${p.photos?.length>1?`<div class="detail-gallery" aria-label="Home photos">${p.photos.map((photo,i)=>photoUrl(photo)?`<button data-gallery="${safe(p.id)}" data-photo-index="${i}" aria-label="View photo ${i+1}"><img src="${safe(photoUrl(photo))}" alt="Photo ${i+1}"></button>`:'').join('')}</div>`:''}<p class="eyebrow">${own?safe(statusLabel(p)):p.owner_id?'OWNER LISTING':'ILLUSTRATIVE SAMPLE · NOT FOR SALE'}</p><h2>${safe(p.title)}</h2><p class="price">${money(p.price)}</p><p>${safe(p.area)}, ${safe(p.zip)} · ${safe(p.type)}</p><p class="facts">${p.beds} beds · ${p.baths} baths · ${p.sqft.toLocaleString()} sq ft</p><p class="detail-description">${safe(p.description)}</p>${own?`<button class="primary" data-edit="${safe(p.id)}">Edit listing</button>`:enabled&&p.status==='published'?`<button class="primary" data-inquire="${safe(p.id)}">Ask the owner ↗</button><p class="small">Your name and account email are shared only when you send an inquiry.</p>`:'<div class="notice"><strong>This home is a preview.</strong><p>Buyer inquiries are available only for real published listings after the marketplace launches.</p></div>'}`;
+  $('detail-content').innerHTML = `<div class="detail-art" id="detail-photo">${image(p)||art(p.color||0)}</div>${p.photos?.length>1?`<div class="detail-gallery" aria-label="Home photos">${p.photos.map((photo,i)=>photoUrl(photo)?`<button data-gallery="${safe(p.id)}" data-photo-index="${i}" aria-label="View photo ${i+1}"><img src="${safe(photoUrl(photo))}" alt="Photo ${i+1}"></button>`:'').join('')}</div>`:''}<p class="eyebrow">${own?safe(statusLabel(p)):p.owner_id?'OWNER LISTING':'ILLUSTRATIVE SAMPLE · NOT FOR SALE'}</p><h2>${safe(p.title)}</h2><p class="price">${money(p.price)}</p><p>${safe(p.area)}, ${safe(p.zip)} · ${safe(p.type)}</p><p class="facts">${p.beds} beds · ${p.baths} baths · ${p.sqft.toLocaleString()} sq ft</p><p class="detail-description">${safe(p.description)}</p>${own?`<button class="primary" data-edit="${safe(p.id)}">Edit listing</button>`:enabled&&p.status==='published'?`<button class="primary" data-inquire="${safe(p.id)}">Ask the owner ↗</button><p class="small">Your account email stays private. Replies appear in your OpenHome messages.</p>`:'<div class="notice"><strong>This home is a preview.</strong><p>Buyer inquiries are available only for real published listings after the marketplace launches.</p></div>'}`;
+  if(!own)$('detail-content').insertAdjacentHTML('beforeend',`<div class="form-actions"><button class="outline" data-report-home="${safe(p.id)}">Report listing</button><button class="outline" data-open-safety>Property-check resources</button></div>`);
   modal('detail');
  }
  function drawDashboard() {
@@ -38,11 +44,11 @@
   $('dashboard-intro').textContent = enabled ? user ? `Signed in as ${user.email}. Manage your homes and check buyer inquiries here.` : 'Sign in to manage your homes and view buyer inquiries.' : 'Your private workspace. Drafts and photos are saved only in this browser; clearing browser data removes them. Public submissions are not open yet.';
   $('account-button').hidden = !enabled; $('account-button').textContent = user ? 'Sign out' : 'Sign in';
   $('inbox').hidden = !enabled || !user;
-  $('dashboard-list').innerHTML = mine.length ? mine.map(p=>`<article class="workspace-card"><div class="workspace-thumb">${image(p)||art(p.color||0)}</div><div class="workspace-info"><span class="status-tag">${safe(statusLabel(p))}</span><h3>${safe(p.title)}</h3><span class="muted">${money(p.price)} · ${safe(p.area)}</span><div class="form-actions"><button class="outline" data-edit="${safe(p.id)}">Edit</button>${p.draft?`<button class="outline" data-export="${safe(p.id)}">Download backup</button><button class="danger" data-remove-draft="${safe(p.id)}">Delete</button>`:p.status!=='archived'?`<button class="outline" data-withdraw="${safe(p.id)}">Withdraw</button>`:''}</div></div></article>`).join('') : '<div class="empty"><h3>A fresh start for your next move.</h3><p>Add your first home to get started.</p></div>';
+  $('dashboard-list').innerHTML = mine.length ? mine.map(p=>`<article class="workspace-card" data-own-listing="${safe(p.id)}"><div class="workspace-thumb">${image(p)||art(p.color||0)}</div><div class="workspace-info"><span class="status-tag">${safe(statusLabel(p))}</span><h3>${safe(p.title)}</h3><span class="muted">${money(p.price)} · ${safe(p.area)}</span><div class="form-actions"><button class="outline" data-edit="${safe(p.id)}">Edit</button>${p.draft?`<button class="outline" data-export="${safe(p.id)}">Download backup</button><button class="danger" data-remove-draft="${safe(p.id)}">Delete</button>`:p.status!=='archived'?`<button class="outline" data-withdraw="${safe(p.id)}">Withdraw</button>`:''}</div></div></article>`).join('') : '<div class="empty"><h3>A fresh start for your next move.</h3><p>Add your first home to get started.</p></div>';
  }
  async function refresh() {
   const generation = ++loadVersion;
-  if (!enabled) { render(); drawDashboard(); return; }
+  if (!enabled) { render(); drawDashboard(); await window.OpenHomeSafety?.refresh(); return; }
   $('dashboard-error').textContent = '';
   try {
    if (!client) throw new Error('Account connection is not ready. Please try again later.');
@@ -59,12 +65,7 @@
    if (generation !== loadVersion) return;
    homes = next.map(p=>({...p,color:0,photos:(p.photos||[]).map(path=>({path,url:links.find(l=>l.path===path)?.signedUrl||''}))}));
    window.OpenHome.homes = homes; render(); drawDashboard();
-   if (user) {
-    const inbox = await client.from('inquiries').select('id,listing_id,buyer_name,buyer_email,message,created_at').eq('seller_id',user.id).order('created_at',{ascending:false}).limit(200);
-    if (generation !== loadVersion) return;
-    if (inbox.error) throw inbox.error;
-    $('inbox-list').innerHTML = inbox.data.length ? inbox.data.map(m=>`<article class="inquiry-card"><p class="eyebrow">${safe(findHome(m.listing_id)?.title||'Property inquiry')}</p><h3>${safe(m.buyer_name)}</h3><p class="small">${safe(new Date(m.created_at).toLocaleString())}</p><p>${safe(m.message)}</p><a class="outline" href="mailto:${safe(encodeURIComponent(m.buyer_email))}?subject=${encodeURIComponent('Your OpenHome inquiry')}">Reply by email ↗</a></article>`).join('') : '<p class="muted">No buyer inquiries yet.</p>';
-   } else $('inbox-list').innerHTML = '';
+   await window.OpenHomeSafety?.refresh();
   } catch (error) { if (generation===loadVersion) { $('dashboard-error').textContent=errorText(error); toast('Could not refresh marketplace data. Please try again.'); } }
  }
  async function resizePhoto(file) {
@@ -94,7 +95,7 @@
   for(const k of ['price','beds','baths','sqft']) values[k]=Number(values[k]);
   if(!values.title||!values.area||!values.description){$('seller-error').textContent='Please complete the title, neighborhood, and description.';return;}
   saving=true;$('save-listing').disabled=true;$('seller-error').textContent='';
-  const uploaded=[]; let committed=false;
+  const uploaded=[]; let committed=false, writeAttempted=false;
   try {
    if (enabled) {
     if(!user||!client)throw new Error('Please sign in again before saving.');
@@ -108,7 +109,9 @@
      if(result.error)throw result.error;uploaded.push(path);paths.push(path);
     }
     const row={...values,photos:paths,status:'pending'};
-    const result=editing ? await client.from('listings').update(row).eq('id',id).eq('owner_id',user.id).select('id').single() : await client.from('listings').insert({...row,id,owner_id:user.id}).select('id').single();
+    const privateData=Object.fromEntries(['claimant_name','property_address','county','relationship','record_reference'].map(k=>[k,form.elements[k].value.trim()]));
+    writeAttempted=true;
+    const result=await client.rpc('submit_home',{home_id:id,expected_revision:editing?.revision||0,home_data:row,private_data:privateData});
     if(result.error)throw result.error;committed=true;
     const removed=(editing?.photos||[]).filter(p=>p.path&&!paths.includes(p.path)).map(p=>p.path);
     if(removed.length)await client.storage.from(bucket).remove(removed);
@@ -119,7 +122,7 @@
     drafts=next;
    }
    $('seller').close();await refresh();modal('dashboard');toast(enabled?'Submitted for review. Your listing is not public yet.':'Private draft saved on this device.');
-  } catch(error){ if(uploaded.length&&!committed)await client.storage.from(bucket).remove(uploaded);$('seller-error').textContent=errorText(error); }
+  } catch(error){ if(uploaded.length&&!committed&&!writeAttempted)await client.storage.from(bucket).remove(uploaded);$('seller-error').textContent=errorText(error); }
   finally{saving=false;$('save-listing').disabled=false;}
  });
  // Prevent closing a form mid-save; its values and photos must remain attached to the same listing.
@@ -165,9 +168,9 @@
  });
  $('inquiry-form').addEventListener('submit',async event=>{
   event.preventDefault();const form=event.target,button=form.querySelector('button');if(button.disabled)return;button.disabled=true;$('inquiry-status').textContent='Sending…';
-  try{if(!user)throw new Error('Please sign in again.');const {error}=await client.rpc('send_inquiry',{home_id:inquiryId,sender_name:form.elements.buyer_name.value.trim(),body:form.elements.message.value.trim()});if(error)throw error;form.reset();$('inquiry-dialog').close();toast('Inquiry delivered to the seller’s dashboard. They can reply by email.');}catch(error){$('inquiry-status').textContent=errorText(error);}finally{button.disabled=false;}
+  try{if(!user)throw new Error('Please sign in again.');const {error}=await client.rpc('send_inquiry',{home_id:inquiryId,sender_name:form.elements.buyer_name.value.trim(),body:form.elements.message.value.trim()});if(error)throw error;form.reset();$('inquiry-dialog').close();toast('Inquiry delivered. Check My listings → Messages for private replies.');}catch(error){$('inquiry-status').textContent=errorText(error);}finally{button.disabled=false;}
  });
- window.OpenHome={enabled,homes,image,openSeller,showDetail};
+ window.OpenHome={enabled,homes,image,openSeller,showDetail,refresh,findHome,get client(){return client;},get user(){return user;}};
  async function init(){
   if(enabled){
    document.querySelector('.demo').textContent='OPENHOME MARKET · Owner-listed homes in San Antonio';
@@ -176,7 +179,7 @@
     if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(config.supabaseUrl)||!config.supabasePublishableKey)throw new Error('Marketplace connection is not configured.');
     client=window.supabase.createClient(config.supabaseUrl,config.supabasePublishableKey);
     const {data,error}=await client.auth.getSession();if(error)throw error;user=data.session?.user||null;
-    client.auth.onAuthStateChange((event,session)=>{const changed=user?.id!==session?.user?.id;user=session?.user||null;if(changed){homes=[];window.OpenHome.homes=[];$('inbox-list').innerHTML='';setTimeout(refresh,0);}});
+    client.auth.onAuthStateChange((event,session)=>{const changed=user?.id!==session?.user?.id;user=session?.user||null;if(changed){sellerVersion++;editing=null;photos=[];for(const id of ['seller','detail','dashboard'])$(id).close();$('seller-form').reset();$('detail-content').textContent='';window.OpenHomeSafety?.clear();homes=[];window.OpenHome.homes=[];$('inbox-list').innerHTML='';setTimeout(refresh,0);}});
    }catch(error){$('dashboard-error').textContent=errorText(error);document.querySelector('.demo').textContent='Marketplace temporarily unavailable · Please try again later';}
   }
   await refresh();

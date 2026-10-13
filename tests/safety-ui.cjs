@@ -1,0 +1,22 @@
+const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');const vm=require('node:vm');const {JSDOM}=require('jsdom');
+const root=path.resolve(__dirname,'..');const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'https://example.test/',runScripts:'outside-only'});const w=dom.window;
+w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false};w.HTMLElement.prototype.scrollIntoView=function(){};
+for(const file of ['partners.js','app.js','config.js','marketplace.js','safety.js'])vm.runInContext(fs.readFileSync(path.join(root,file),'utf8'),dom.getInternalVMContext());
+const $=id=>w.document.getElementById(id),tick=()=>new Promise(r=>setTimeout(r,10));const submit=f=>f.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+(async()=>{
+ $('try-messages').click();await tick();assert($('conversation').open);assert.match($('conversation-mode').textContent,/No person/);
+ const reply=$('reply-form');reply.elements.body.value='<img src=x onerror=alert(1)> Thanks!';submit(reply);await tick();assert.equal($('conversation-messages').querySelectorAll('.message-bubble').length,2);assert(!$('conversation-messages').querySelector('img'));
+ $('block-contact').click();await tick();assert(reply.querySelector('button').disabled);assert.match($('conversation-status').textContent,/paused/);
+ $('block-contact').click();await tick();assert(!reply.querySelector('button').disabled);
+ w.document.querySelector('[data-report-message]').click();assert($('report-dialog').open);assert.match($('report-mode').textContent,/No real report/);
+ const report=$('report-form');report.elements.details.value='Please review this demo message.';submit(report);await tick();
+ $('moderation-demo').click();await tick();assert($('moderation').open);w.document.querySelector('[data-review-tab="reports"]').click();assert(w.document.querySelector('[data-resolve]'));
+ w.document.querySelector('[data-resolve]').click();assert($('resolve-report').open);assert($('hide-reported-home').hidden);$('resolve-form').elements.note.value='Reviewed the example concern.';submit($('resolve-form'));await tick();assert.equal(w.document.querySelectorAll('[data-resolve]').length,0);
+ w.document.querySelector('[data-review-tab="pending"]').click();w.document.querySelector('[data-review-home]').click();await tick();assert($('review-home').open);
+ const review=$('review-form');review.elements.note.value='Reviewed demo records.';submit(review);await tick();assert.match($('review-error').textContent,/both identity/);
+ review.elements.identity.checked=true;review.elements.authority.checked=true;submit(review);await tick();assert.equal(w.document.querySelectorAll('[data-review-home]').length,1);
+ w.document.querySelector('[data-review-tab="history"]').click();assert.match($('moderation-list').textContent,/published/);
+ assert(!$('inbox-list').innerHTML.includes('mailto:'));assert(w.document.querySelector('a[href="https://bcad.org/"]'));assert(w.document.querySelector('a[href="https://www.bexar.org/2984/Public-Record-Search"]'));
+ w.OpenHomeSafety.clear();assert(!$('moderation').open);assert.equal($('conversation-messages').textContent,'');
+ console.log('PASS: demo messages/replies, HTML escaping, block/unblock, reports/resolution, required review checks/history, ownership resources, and private-state clearing.');w.close();
+})().catch(e=>{console.error(e);w.close();process.exitCode=1});

@@ -28,8 +28,7 @@ $('saved-toggle').addEventListener('click',()=>{savedOnly=!savedOnly;render();})
 $('hero-art').insertAdjacentHTML('afterbegin',art(0,true));render();
 
 const pricingPackages = {
- featured: {name:'Featured home',price:'$49 / 30 days',summary:'A planned 30-day sponsored placement for your home. Your basic listing stays free. No automatic renewal is planned, and visibility does not guarantee a sale.'},
- marketing: {name:'Seller marketing kit',price:'$99 / one time',summary:'Planned deliverables: polished listing copy, a downloadable property flyer, and social media graphics. Photography, printing, and paid advertising budgets are not included. Delivery timing will be confirmed before launch.'},
+ marketing: {name:'Seller Launch Kit',price:'$39 / one time',summary:'Planned digital deliverables: a downloadable property flyer, social media graphics, printable open-house sign artwork, and a QR code linking to your live listing. A live listing URL is required for the QR code. Photography, printing, paid ads, brokerage, MLS placement, and closing services are excluded. Delivery timing and revision limits will be confirmed before purchase. No inquiries or sale are guaranteed.'},
  trial: {name:'Founding business trial',price:'Free / 30 days',summary:'A proposed introductory directory profile for contractors, painters, cleaners, landscapers, and movers. A trial would not automatically convert to a paid membership. Applications are not open yet.'},
  directory: {name:'Business directory',price:'$49 / month',summary:'A proposed paid advertising profile with business details, photos, service area, and a website link. Final rates and subscription terms will be confirmed before launch. No leads or jobs are guaranteed. Settlement-service providers require a separately reviewed arrangement.'}
 };
@@ -44,6 +43,7 @@ document.addEventListener('click', event => {
  $('plan-title').textContent=plan.name;
  $('plan-price').textContent=plan.price;
  $('plan-summary').textContent=plan.summary;
+ $('plan-interest').href='mailto:openhomemarketsupport@zohomail.com?subject='+encodeURIComponent('OpenHome Market: '+plan.name+' interest')+'&body='+encodeURIComponent('Hello OpenHome Market,\n\nPlease send me availability updates about '+plan.name+'.\nMy city: \n\nThank you.');
  $('plan-detail').showModal();
 });
 

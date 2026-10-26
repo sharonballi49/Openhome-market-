@@ -40,6 +40,7 @@
   modal('detail');
  }
  function drawDashboard() {
+  $('draft-restore').hidden=enabled;
   const mine = enabled ? homes.filter(p=>p.owner_id===user?.id) : drafts;
   $('dashboard-intro').textContent = enabled ? user ? `Signed in as ${user.email}. Manage your homes and check buyer inquiries here.` : 'Sign in to manage your homes and view buyer inquiries.' : 'Your private workspace. Drafts and photos are saved only in this browser; clearing browser data removes them. Public submissions are not open yet.';
   $('account-button').hidden = !enabled; $('account-button').textContent = user ? 'Sign out' : 'Sign in';
@@ -150,6 +151,29 @@
   }
  });
  $('my-listings').addEventListener('click',()=>{drawDashboard();modal('dashboard');refresh();});
+ $('draft-backup').addEventListener('change',async event=>{
+  if(enabled)return;
+  const input=event.target,file=input.files?.[0];if(!file)return;
+  $('restore-status').textContent='Reading your backup…';
+  try{
+   if(file.size>10*1024*1024)throw Error('Choose a backup smaller than 10 MB.');
+   const text=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('Could not read this file.'));reader.readAsText(file);});
+   let data;try{data=JSON.parse(text);}catch{throw Error('This file is not a valid JSON backup.');}
+   if(!data||Array.isArray(data)||data.draft!==true)throw Error('Choose a private draft backup downloaded from OpenHome.');
+   const limits={title:80,area:50,description:1500};
+   for(const [key,max] of Object.entries(limits))if(typeof data[key]!=='string'||!data[key].trim()||data[key].length>max)throw Error('The backup has an invalid '+key+'.');
+   if(typeof data.zip!=='string'||!/^\d{5}$/.test(data.zip)||!['House','Townhome','Condo'].includes(data.type))throw Error('The backup has an invalid ZIP code or property type.');
+   for(const [key,min,max,step] of [['price',1,100000000,1],['beds',0,30,1],['baths',0.5,30,0.5],['sqft',1,1000000,1]])if(!Number.isFinite(data[key])||data[key]<min||data[key]>max||data[key]%step!==0)throw Error('The backup has an invalid '+key+'.');
+   if(!Array.isArray(data.photos)||data.photos.length>6||data.photos.some(p=>typeof p!=='string'||!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(p)))throw Error('The backup contains unsupported photos. Only embedded JPG, PNG, and WebP photos are accepted.');
+   await openSeller();
+   for(const field of fields)$('seller-form').elements[field].value=data[field];
+   photos=[...data.photos];drawPhotos();
+   $('seller-title').textContent='Review your restored draft.';
+   $('seller-intro').textContent='Nothing has been saved yet. Review these details and photos, then save a new private draft on this device. Your existing drafts will stay unchanged.';
+   $('restore-status').textContent='Backup loaded for review. Save the form to keep a new copy.';
+  }catch(error){$('restore-status').textContent=errorText(error);}
+  finally{input.value='';}
+ });
  $('dashboard-new').addEventListener('click',()=>openSeller());
  $('refresh-dashboard').addEventListener('click',refresh);
  $('account-button').addEventListener('click',async()=>{

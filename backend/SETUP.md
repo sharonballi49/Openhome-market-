@@ -26,7 +26,7 @@ The website has a moderator-only review dashboard, accessible from Safety after 
 
 Photo upload and database save are separate operations. The client cleans up failures before the database request and removed photos after success. After a database request has been attempted, it retains uploaded files on error because a lost response could conceal a successful commit. Interrupted or rejected submissions can therefore leave orphaned files. Periodically review and delete unused files through the Storage API/dashboard, not SQL deletion of storage metadata. Deleting an auth user removes database records but also requires Storage cleanup. Signed photo URLs expire after an hour; refresh the page to renew them.
 
-Drafts are local to this browser and may be lost when browser data is cleared. The Download backup button exports the draft and photo data as JSON for safekeeping; automatic restore/import is not implemented.
+Drafts are local to this browser and may be lost when browser data is cleared. The Download backup button exports the draft and photo data as JSON for safekeeping; Restore a downloaded draft accepts a validated JSON backup up to 10 MB in demo mode, opens it for review, and saves it as a new private draft only when the seller confirms. Existing drafts are not overwritten.
 
 References: [Passwordless email](https://supabase.com/docs/guides/auth/auth-email-passwordless), [Storage access control](https://supabase.com/docs/guides/storage/security/access-control), [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).
 

@@ -18,6 +18,7 @@
   for(const id of ['inbox-list','moderation-list','review-summary','conversation-messages','report-evidence'])$(id).textContent='';
   for(const id of ['review-form','report-form','resolve-form','reply-form'])$(id).reset();
   $('moderation-open').hidden=true;
+  $('review-counts').textContent='';$('review-search').value='';
  }
  async function canSell(){if(!live())return true;if(!api().user)return false;try{pilot=await rpc('is_pilot_seller');return pilot===true;}catch{return false;}}
  function drawInbox(){
@@ -28,7 +29,12 @@
   $('moderation-mode').textContent=live()?'Only authorized moderators can review this queue. Checks must be completed outside the website before you record approval.':'Interactive demo · Fictional listings and messages. No approval, block, or report here changes a real account.';
   document.querySelectorAll('[data-review-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.reviewTab===tab)));
   const target=$('moderation-list');
-  if(tab==='pending')target.innerHTML=queue.filter(p=>p.status==='pending').map(p=>`<article class="workspace-card"><div class="workspace-thumb">${api().image(p)||art(p.color||0)}</div><div class="workspace-info"><span class="status-tag">${live()?'Awaiting review':'Demo · awaiting review'}</span><h3>${safe(p.title)}</h3><p class="muted">${safe(p.area)} · ${money(p.price)}</p><button class="outline" data-review-home="${safe(p.id)}">Review listing</button></div></article>`).join('')||'<div class="empty"><h3>All caught up.</h3><p>No listings are waiting for review.</p></div>';
+  const pending=queue.filter(p=>p.status==='pending');
+  $('review-counts').innerHTML=`<div><strong>${pending.length}</strong><span>Awaiting review</span></div><div><strong>${reports.filter(r=>r.status==='open').length}</strong><span>Open reports</span></div><div><strong>${reviews.length}</strong><span>Listing decisions</span></div>`;
+  $('review-search').parentElement.hidden=tab!=='pending';
+  const query=$('review-search').value.trim().toLowerCase();
+  const matching=pending.filter(p=>[p.title,p.area,p.zip].join(' ').toLowerCase().includes(query));
+  if(tab==='pending')target.innerHTML=matching.map(p=>`<article class="workspace-card"><div class="workspace-thumb">${api().image(p)||art(p.color||0)}</div><div class="workspace-info"><span class="status-tag">${live()?'Awaiting review':'Demo · awaiting review'}</span><h3>${safe(p.title)}</h3><p class="muted">${safe(p.area)} · ${money(p.price)}</p><button class="outline" data-review-home="${safe(p.id)}">Review listing</button></div></article>`).join('')||(pending.length?'<div class="empty"><h3>No matching listings.</h3><p>Try a different title, neighborhood, or ZIP.</p></div>':'<div class="empty"><h3>All caught up.</h3><p>No listings are waiting for review.</p></div>');
   if(tab==='reports')target.innerHTML=reports.filter(r=>r.status==='open').map(r=>`<article class="inquiry-card"><span class="status-tag">${r.message_id?'Message report':'Listing report'}</span><h3>${safe(labels[r.category]||r.category)}</h3><p>${safe(r.details)}</p><button class="outline" data-resolve="${safe(r.id)}">Review report</button></article>`).join('')||'<div class="empty"><h3>No open reports.</h3><p>Reported listings and messages appear here for review.</p></div>';
   if(tab==='history')target.innerHTML=[...reviews.map(r=>`<article class="inquiry-card"><span class="status-tag">${safe(r.decision)}</span><h3>${safe(queue.find(p=>p.id===r.listing_id)?.title||'Listing review')}</h3><p>${safe(r.note)}</p></article>`),...reports.filter(r=>r.status==='resolved').map(r=>`<article class="inquiry-card"><span class="status-tag">Report resolved</span><h3>${safe(labels[r.category]||r.category)}</h3><p>${safe(r.resolution)}</p></article>`)].join('')||'<p class="muted">Review decisions and resolved reports will appear here.</p>';
  }
@@ -57,7 +63,7 @@
  async function openReview(id){
   if(!moderator)return;reviewHome=queue.find(p=>p.id===id);if(!reviewHome)return;
   const selected=reviewHome;let details={claimant_name:'Demo seller',property_address:'Fictional property — no real address',county:'Bexar',relationship:'owner',record_reference:'Demo record only'},photoMarkup=art(selected.color||0);
-  $('review-error').textContent='';$('review-form').reset();
+  $('review-error').textContent='';$('review-form').reset();updateDecisionHelp();
   try{
    if(live()){
     const r=await api().client.from('listing_verification').select('*').eq('listing_id',id).maybeSingle();if(r.error)throw r.error;details=r.data;
@@ -92,6 +98,13 @@
   reportTarget=target;$('report-form').reset();$('report-error').textContent='';$('report-mode').textContent=live()?'Your concern will go to the OpenHome moderation team.':'Demo report · No real report will be submitted. You can review the example in the demo dashboard.';
   $('detail').close();$('conversation').close();modal('report-dialog');
  }
+ function updateDecisionHelp(){
+  const decision=$('review-form').elements.decision.value;
+  $('review-decision-help').textContent=decision==='published'?'Approve: make this listing public after completing both checks. Your note is visible to the seller.':decision==='rejected'?'Return for changes: keep the listing private. Explain exactly what the seller should correct before resubmitting.':'Withdraw: remove this listing from public availability. Explain the reason in your note.';
+ }
+ $('review-form').elements.decision.addEventListener('change',updateDecisionHelp);
+ $('review-search').addEventListener('input',drawModeration);
+ $('review-back').addEventListener('click',()=>{$('review-home').close();reviewHome=null;modal('moderation');});
  $('review-form').addEventListener('submit',async event=>{
   event.preventDefault();if(!reviewHome||!moderator)return;const f=event.target,b=f.querySelector('button');if(b.disabled)return;
   const decision=f.elements.decision.value,identity=f.elements.identity.checked,authority=f.elements.authority.checked,note=f.elements.note.value.trim();
@@ -99,7 +112,7 @@
   if(note.length<5){$('review-error').textContent='Add a review note.';return;}b.disabled=true;
   try{
    if(live())await rpc('review_listing',{home_id:reviewHome.id,expected_revision:reviewHome.revision,decision,review_note:note,identity_checked:identity,authority_checked:authority});
-   else{demoReviews.unshift({listing_id:reviewHome.id,decision,note});reviewHome.status=decision;reviewHome.revision++;}
+   else{demoReviews.unshift({listing_id:reviewHome.id,decision,note,created_at:new Date().toISOString()});reviewHome.status=decision;reviewHome.revision++;}
    $('review-home').close();await api().refresh();modal('moderation');toast(live()?'Review decision saved.':'Demo decision saved. No real listing was changed.');
   }catch(e){$('review-error').textContent=errorText(e);}finally{b.disabled=false;}
  });

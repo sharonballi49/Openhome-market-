@@ -13,7 +13,13 @@ const $=id=>w.document.getElementById(id),tick=()=>new Promise(r=>setTimeout(r,1
  $('moderation-demo').click();await tick();assert($('moderation').open);w.document.querySelector('[data-review-tab="reports"]').click();assert(w.document.querySelector('[data-resolve]'));
  w.document.querySelector('[data-resolve]').click();assert($('resolve-report').open);assert($('hide-reported-home').hidden);$('resolve-form').elements.note.value='Reviewed the example concern.';submit($('resolve-form'));await tick();assert.equal(w.document.querySelectorAll('[data-resolve]').length,0);
  w.document.querySelector('[data-review-tab="pending"]').click();w.document.querySelector('[data-review-home]').click();await tick();assert($('review-home').open);
- const review=$('review-form');review.elements.note.value='Reviewed demo records.';submit(review);await tick();assert.match($('review-error').textContent,/both identity/);
+ $('review-back').click();assert($('moderation').open);assert(!$('review-home').open);
+ assert.match($('review-counts').textContent,/2Awaiting review/);
+ $('review-search').value='no-such-neighborhood';$('review-search').dispatchEvent(new w.Event('input'));assert.equal(w.document.querySelectorAll('[data-review-home]').length,0);assert.match($('moderation-list').textContent,/No matching/);
+ $('review-search').value='';$('review-search').dispatchEvent(new w.Event('input'));assert.equal(w.document.querySelectorAll('[data-review-home]').length,2);
+ w.document.querySelector('[data-review-home]').click();await tick();
+ const review=$('review-form');review.elements.decision.value='rejected';review.elements.decision.dispatchEvent(new w.Event('change'));assert.match($('review-decision-help').textContent,/keep the listing private/);review.elements.decision.value='published';review.elements.decision.dispatchEvent(new w.Event('change'));
+ review.elements.note.value='Reviewed demo records.';submit(review);await tick();assert.match($('review-error').textContent,/both identity/);
  review.elements.identity.checked=true;review.elements.authority.checked=true;submit(review);await tick();assert.equal(w.document.querySelectorAll('[data-review-home]').length,1);
  w.document.querySelector('[data-review-tab="history"]').click();assert.match($('moderation-list').textContent,/published/);
  assert(!$('inbox-list').innerHTML.includes('mailto:'));assert(w.document.querySelector('a[href="https://bcad.org/"]'));assert(w.document.querySelector('a[href="https://www.bexar.org/2984/Public-Record-Search"]'));
